@@ -102,6 +102,18 @@ contract PoSPool is PoolContext, Ownable, Initializable {
 
   function _userShareRatio(address _user) public view returns (uint256) {
     if (feeFreeWhiteList.contains(_user)) return RATIO_BASE;
+
+    UserSummary memory uSummary = userSummaries[_user];
+    if (uSummary.available >= 1000) { // VIP4(100w) 2%
+      return 9800;
+    } else if (uSummary.available >= 100) { // VIP3(10w) 3%
+      return 9700;
+    } else if (uSummary.available >= 50){ // VIP2(5w) 4%
+      return 9600;
+    } else if (uSummary.available >= 10) { // VIP1(1w) 5%
+      return 9500;
+    }
+
     return poolUserShareRatio;
   }
 
@@ -159,8 +171,8 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     });
 
     uint256 outdatedBlock = 0;
-    if (_blockNumber() > ONE_DAY_BLOCK_COUNT.mul(7)) {
-      outdatedBlock = _blockNumber().sub(ONE_DAY_BLOCK_COUNT.mul(7));
+    if (_blockNumber() > ONE_DAY_BLOCK_COUNT) {
+      outdatedBlock = _blockNumber().sub(ONE_DAY_BLOCK_COUNT);
     }
     apyNodes.enqueueAndClearOutdated(node, outdatedBlock);
   }
@@ -400,8 +412,8 @@ contract PoSPool is PoolContext, Ownable, Initializable {
       totalWorkload = totalWorkload.add(node.available.mul(CFX_VALUE_OF_ONE_VOTE).mul(node.endBlock - node.startBlock));
     }
 
-    if (_blockNumber() > lastPoolShot.blockNumber) {
-      uint256 _latestReward = _selfBalance().sub(lastPoolShot.balance);
+    uint256 _latestReward = _selfBalance().sub(lastPoolShot.balance);
+    if (_blockNumber() > lastPoolShot.blockNumber && _latestReward > 0) {
       totalReward = totalReward.add(_latestReward);
       totalWorkload = totalWorkload.add(lastPoolShot.available.mul(CFX_VALUE_OF_ONE_VOTE).mul(_blockNumber() - lastPoolShot.blockNumber));
     }
