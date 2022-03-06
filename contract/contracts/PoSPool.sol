@@ -453,8 +453,8 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     return stakers.at(i);
   }
 
-  function userShareRatio() public view returns (uint256) {
-    return _userShareRatio(msg.sender);
+  function userShareRatio(address _account) public view returns (uint256) {
+    return _userShareRatio(_account);
   }
 
   // ======================== admin methods =====================
