@@ -171,8 +171,8 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     });
 
     uint256 outdatedBlock = 0;
-    if (_blockNumber() > ONE_DAY_BLOCK_COUNT) {
-      outdatedBlock = _blockNumber().sub(ONE_DAY_BLOCK_COUNT);
+    if (_blockNumber() > ONE_DAY_BLOCK_COUNT.mul(2)) {
+      outdatedBlock = _blockNumber().sub(ONE_DAY_BLOCK_COUNT.mul(2));
     }
     apyNodes.enqueueAndClearOutdated(node, outdatedBlock);
   }
