@@ -413,7 +413,28 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     }
 
     uint256 _latestReward = _selfBalance().sub(lastPoolShot.balance);
-    if (_blockNumber() > lastPoolShot.blockNumber && _latestReward > 0) {
+    if (_latestReward > 0) {
+      totalReward = totalReward.add(_latestReward);
+      totalWorkload = totalWorkload.add(lastPoolShot.available.mul(CFX_VALUE_OF_ONE_VOTE).mul(_blockNumber() - lastPoolShot.blockNumber));
+    }
+
+    return totalReward.mul(RATIO_BASE).mul(ONE_YEAR_BLOCK_COUNT).div(totalWorkload);
+  }
+
+  function poolAPY(uint blockNumber) public view returns (uint256) {
+    if(apyNodes.start == apyNodes.end) return 0;
+    
+    uint256 totalReward = 0;
+    uint256 totalWorkload = 0;
+    for(uint256 i = apyNodes.start; i < apyNodes.end; i++) {
+      PoolAPY.ApyNode memory node = apyNodes.items[i];
+      if (node.endBlock > blockNumber) break; // skip future nodes
+      totalReward = totalReward.add(node.reward);
+      totalWorkload = totalWorkload.add(node.available.mul(CFX_VALUE_OF_ONE_VOTE).mul(node.endBlock - node.startBlock));
+    }
+
+    uint256 _latestReward = _selfBalance().sub(lastPoolShot.balance);
+    if (_latestReward > 0) {
       totalReward = totalReward.add(_latestReward);
       totalWorkload = totalWorkload.add(lastPoolShot.available.mul(CFX_VALUE_OF_ONE_VOTE).mul(_blockNumber() - lastPoolShot.blockNumber));
     }
