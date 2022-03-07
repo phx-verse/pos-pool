@@ -36,7 +36,8 @@ const conflux = new Conflux({
   networkId: parseInt(process.env.CFX_NETWORK_ID),
   // logger: console,
 });
-const account = conflux.wallet.addPrivateKey(process.env.PRIVATE_KEY);
+const keystore = require(process.env.KEYSTORE);
+const account = conflux.wallet.addKeystore(keystore, process.env.KEYSTORE_PWD);
 
 // const posRegisterContract = conflux.InternalContract('PoSRegister');
 
@@ -215,24 +216,16 @@ program
   });
 
 program
-  .command('QueryPoolUserShareRatio')
-  .argument('[from]', 'Query transaction from')
-  .action(async (from, ...args) => {
-    const result = await poolContract.userShareRatio().call({
-      from,
-    });
-    console.log(result);
-  });
-
-program
   .command('QueryPool')
   .argument('<method>', 'Available methods: poolSummary, userSummary, identifierToAddress, userInQueue, userOutQueue, userInterest, poolAPY, poolName, userInterest, posAddress')
   .argument('[arg]', 'Arguments for the method')
-  .action(async (method, ...args) => {
+  .action(async (method, arg) => {
     if (!poolContract[method]) {
       console.log('Invalid method');
       return;
     }
+    const args = [];
+    if (arg) args.push(arg);
     const result = await poolContract[method](...args);
     console.log(result);
   });

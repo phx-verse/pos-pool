@@ -7,7 +7,9 @@ const conflux = new Conflux({
   networkId: parseInt(process.env.CFX_NETWORK_ID),
 });
 
-const account = conflux.wallet.addPrivateKey(process.env.PRIVATE_KEY);
+// const account = conflux.wallet.addPrivateKey(process.env.PRIVATE_KEY);
+const keystore = require(process.env.KEYSTORE);
+const account = conflux.wallet.addKeystore(keystore, process.env.KEYSTORE_PWD);
 
 module.exports = {
   conflux,
