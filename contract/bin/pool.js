@@ -2,34 +2,16 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable node/no-unpublished-require */
 /* eslint-disable prettier/prettier */
+require('dotenv').config();
+const {Conflux, Drip, format} = require('js-conflux-sdk');
+const { program } = require("commander");
+const { loadPrivateKey } = require('../utils');
 const poolDebugContractInfo = require("../artifacts/contracts/PoSPoolDebug.sol/PoSPoolDebug.json");
 const poolContractInfo = require("../artifacts/contracts/PoSPool.sol/PoSPool.json");
 const poolManagerInfo = require("../artifacts/contracts/PoolManager.sol/PoolManager.json");
 const mockStakingInfo = require("../artifacts/contracts/mocks/Staking.sol/MockStaking.json");
 const mockPosRegisterInfo = require("../artifacts/contracts/mocks/PoSRegister.sol/MockPoSRegister.json");
 const poolProxyInfo = require("../artifacts/contracts/PoSPoolProxy1967.sol/PoSPoolProxy1967.json");
-const {Conflux, Drip, format} = require('js-conflux-sdk');
-const { program } = require("commander");
-require('dotenv').config();
-
-function getContractInfo(name) {
-  switch (name) {
-    case "PoolDebug":
-      return poolDebugContractInfo;
-    case "Pool":
-      return poolContractInfo;
-    case "PoolManager":
-      return poolManagerInfo;
-    case "PoolProxy":
-      return poolProxyInfo;
-    case "MockStaking":
-      return mockStakingInfo;
-    case "MockPosRegister":
-      return mockPosRegisterInfo;
-    default:
-      throw new Error(`Unknown contract name: ${name}`);
-  }
-}
 
 const conflux = new Conflux({
   url: process.env.CFX_RPC_URL,
@@ -37,15 +19,9 @@ const conflux = new Conflux({
   // logger: console,
 });
 
-let account;
-if (process.env.PRIVATE_KEY) {
-  account = conflux.wallet.addPrivateKey(process.env.PRIVATE_KEY);
-} else {
-  const keystore = require(process.env.KEYSTORE);
-  account = conflux.wallet.addKeystore(keystore, process.env.KEYSTORE_PWD);
-}
+const account = conflux.wallet.addPrivateKey(loadPrivateKey());
 
-// const posRegisterContract = conflux.InternalContract('PoSRegister');
+const posRegisterContract = conflux.InternalContract('PoSRegister');
 
 const poolContract = conflux.Contract({
   abi: poolContractInfo.abi,
@@ -65,15 +41,6 @@ const poolManagerContract = conflux.Contract({
 program.version("0.0.1");
 program
   .option('-d, --debug', 'output extra debugging')
-
-// const options = program.opts();
-// if (options.debug) console.log(options);
-
-/* program
-  .command('command <args...>')
-  .action(async (args) => {
-    console.log(args)
-  }); */
 
 program
   .command('chainStatus [type]')
@@ -172,7 +139,7 @@ program
   .command('QueryProxyImpl')
   .action(async () => {
     const address = await poolProxyContract.implementation();
-    console.log(address);
+    console.log('Implementation address: ', address);
   });
 
 program
@@ -196,6 +163,26 @@ program
       value: Drip.fromCFX(parseInt(value)),
     }).executed();
     checkReceiptStatus(receipt, method);
+  });
+
+program
+  .command('withdrawPoolProfit')
+  .argument('<receiver>', 'Reciver address')
+  .action(async (receiver) => {
+    const contract = poolContract;
+    const poolSummary = await contract.poolSummary();
+    const toClaim = poolSummary.interest - BigInt(Drip.fromGDrip(1));
+    console.log('Claiming pool profit: ', Drip(toClaim).toCFX());
+    const receipt = await contract._withdrawPoolProfit(toClaim).sendTransaction({
+      from: account.address,
+    }).executed();
+    checkReceiptStatus(receipt, '_withdrawPoolProfit');
+    const transferReceipt = await conflux.cfx.sendTransaction({
+      from: account.address,
+      to: receiver,
+      value: toClaim
+    }).executed();
+    checkReceiptStatus(transferReceipt, 'send CFX');
   });
 
 program
@@ -274,6 +261,14 @@ program
     checkReceiptStatus(receipt, 'setEspacePool');
   });
 
+program
+  .command('PoolManagerQueryEPool')
+  .argument('<arg>', 'Pool address')
+  .action(async (corePoolAddr) => {
+    const ePoolAddress = await poolManagerContract.eSpacePoolAddresses(corePoolAddr);
+    console.log(format.hexAddress(ePoolAddress));
+  });
+
 program.parse(process.argv);
 
 function checkReceiptStatus(receipt, operate) {
@@ -284,5 +279,24 @@ function checkDeployStatus(receipt, operate) {
   console.log(`${operate} ${receipt.outcomeStatus === 0 ? 'Success': 'Fail'}`);
   if (receipt.outcomeStatus === 0) {
     console.log('Deploy success: ', receipt.contractCreated);
+  }
+}
+
+function getContractInfo(name) {
+  switch (name) {
+    case "PoolDebug":
+      return poolDebugContractInfo;
+    case "Pool":
+      return poolContractInfo;
+    case "PoolManager":
+      return poolManagerInfo;
+    case "PoolProxy":
+      return poolProxyInfo;
+    case "MockStaking":
+      return mockStakingInfo;
+    case "MockPosRegister":
+      return mockPosRegisterInfo;
+    default:
+      throw new Error(`Unknown contract name: ${name}`);
   }
 }
