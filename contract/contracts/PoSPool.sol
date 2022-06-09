@@ -114,7 +114,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
       return 9500;
     }
 
-    return poolUserShareRatio;
+    return 9400; // Default is 6%
   }
 
   function _calUserShare(uint256 reward, address _stakerAddress) private view returns (uint256) {
