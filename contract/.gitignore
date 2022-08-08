@@ -117,3 +117,4 @@ scripts/destroy.js
 scripts/PoSstakerSnapshot.json
 
 scripts/*.csv
+flattened.sol

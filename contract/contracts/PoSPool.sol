@@ -321,6 +321,21 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     }
   }
 
+  function mergeUnstake() public onlyRegisted {
+    userSummaries[msg.sender].unlocked += userOutqueues[msg.sender].collectEndedVotes();
+  }
+
+  function withdrawStakeDebug(uint64 votePower) public onlyRegisted {
+    _stakingWithdraw(votePower * CFX_VALUE_OF_ONE_VOTE);
+    //    
+    userSummaries[msg.sender].unlocked -= votePower;
+    userSummaries[msg.sender].votes -= votePower;
+    
+    address payable receiver = payable(msg.sender);
+    receiver.transfer(votePower * CFX_VALUE_OF_ONE_VOTE);
+    emit WithdrawStake(msg.sender, votePower);
+  }
+
   ///
   /// @notice User's interest from participate PoS
   /// @param _address The address of user to query

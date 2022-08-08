@@ -10,7 +10,7 @@
     "commander": "^8.3.0",
     "debug": "^4.3.4",
     "ding-robot": "^1.0.0",
-    "js-conflux-sdk": "^2.0.7",
+    "js-conflux-sdk": "^2.1.2",
     "json2csv": "^5.0.7"
   },
   "devDependencies": {
@@ -41,7 +41,8 @@
   "scripts": {
     "test": "mocha",
     "docs": "npx solidity-docgen --solc-module solc-0.8",
-    "compile": "npx hardhat compile"
+    "compile": "npx hardhat compile",
+    "flatten": "npx hardhat flatten contracts/PoSPool.sol > flattend.sol"
   },
   "repository": {
     "type": "git",
