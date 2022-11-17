@@ -6,6 +6,7 @@ require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 // require("hardhat-contract-sizer");
+const { loadPrivateKey } = require('./utils');
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -17,10 +18,7 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
-
-const accounts = process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [];
+const PRIVATE_KEY = loadPrivateKey();
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -33,21 +31,24 @@ module.exports = {
     },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
-      accounts,
+      accounts:
+        PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
     },
     espace: {
       url: "https://evm.confluxrpc.com",
-      accounts,
+      accounts: [PRIVATE_KEY],
       chainId: 1030,
     },
     espaceTestnet: {
       url: "https://evmtestnet.confluxrpc.com",
-      accounts,
+      accounts: [PRIVATE_KEY],
       chainId: 71,
     },
     net8889: {
       url: "http://net8889eth.confluxrpc.com",
-      accounts,
+      accounts: [
+        PRIVATE_KEY,
+      ],
       chainId: 8889,
     },
   },
