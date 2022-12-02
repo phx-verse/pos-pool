@@ -1,6 +1,6 @@
 require("dotenv").config();
 const {conflux, Drip, account, logReceipt} = require("../conflux");
-const poolContractInfo = require("../artifacts/contracts/PoSPool.sol/PoSPool.json");
+const poolContractInfo = require("../../artifacts/contracts/PoSPool.sol/PoSPool.json");
 
 const poolContract = conflux.Contract({
     abi: poolContractInfo.abi,
@@ -11,11 +11,11 @@ async function main() {
     const len = await poolContract.stakerNumber();
     console.log('Staker number', len);
     
-    let allunLocked = await isAllVotesUnLocked(len);
+    /* let allunLocked = await isAllVotesUnLocked(len);
     if (!allunLocked) {
         console.log("Not all votes are unlocked, can't restake");
         return;
-    }
+    } */
 
     await increaseStakeOneByOne(len);
 
@@ -29,6 +29,8 @@ async function increaseStakeOneByOne(len) {
         const staker = await poolContract.stakerAddress(i);
         if (staker === account.address) continue;
         const _uSummary = await poolContract.userSummary(staker);
+        if (_uSummary.unlocked === 0n) continue;
+        console.log('Staker', i);
         let receipt = await poolContract
             .increaseStakeByAdmin(staker, _uSummary.unlocked)
             .sendTransaction({
