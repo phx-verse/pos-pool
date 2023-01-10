@@ -106,20 +106,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   // ======================== Helpers =========================
 
   function _userShareRatio(address _user) public view returns (uint256) {
-    if (feeFreeWhiteList.contains(_user)) return RATIO_BASE;
-
-    UserSummary memory uSummary = userSummaries[_user];
-    if (uSummary.available >= 1000) { // VIP4(100w) 2%
-      return 9800;
-    } else if (uSummary.available >= 100) { // VIP3(10w) 3%
-      return 9700;
-    } else if (uSummary.available >= 50){ // VIP2(5w) 4%
-      return 9600;
-    } else if (uSummary.available >= 10) { // VIP1(1w) 5%
-      return 9500;
-    }
-
-    return 9400; // Default is 6%
+    return poolUserShareRatio;
   }
 
   function _calUserShare(uint256 reward, address _stakerAddress) private view returns (uint256) {
