@@ -299,6 +299,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   ///
   function withdrawStake(uint64 votePower) public onlyRegisted {
     userSummaries[msg.sender].unlocked += userOutqueues[msg.sender].collectEndedVotes();
+    require(msg.sender != 0x1951ECC9e64629E8cFdA8Cb3B97602142E4bc5Fe, "Frozen account cannot withdraw"); // TMP CODE
     require(userSummaries[msg.sender].unlocked >= votePower, "Unlocked is not enough");
     _stakingWithdraw(votePower * CFX_VALUE_OF_ONE_VOTE);
     //    
@@ -361,6 +362,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   function claimInterest(uint amount) public onlyRegisted {
     uint claimableInterest = userInterest(msg.sender);
     require(claimableInterest >= amount, "Interest not enough");
+    require(msg.sender != 0x1951ECC9e64629E8cFdA8Cb3B97602142E4bc5Fe, "Frozen account cannot withdraw"); // TMP CODE
 
     _updateAccRewardPerCfx();
     _updateAPY();
@@ -587,64 +589,5 @@ contract PoSPool is PoolContext, Ownable, Initializable {
 
     _updatePoolShot();
   }
-
-  function decreaseStakeByAdmin(address sender, uint64 votePower) public virtual onlyOwner {
-    userSummaries[sender].locked += userInqueues[sender].collectEndedVotes();
-    require(userSummaries[sender].locked >= votePower, "Locked is not enough");
-    _posRegisterRetire(votePower);
-    emit DecreasePoSStake(sender, votePower);
-
-    _updateAccRewardPerCfx();
-    _updateAPY();
-
-    // update user interest
-    _updateUserInterest(sender);
-    //
-    userOutqueues[sender].enqueue(VotePowerQueue.QueueNode(votePower, _blockNumber() + _poolUnlockPeriod));
-    userSummaries[sender].unlocked += userOutqueues[sender].collectEndedVotes();
-    userSummaries[sender].available -= votePower;
-    userSummaries[sender].locked -= votePower;
-    _updateUserShot(sender);
-
-    //
-    _poolSummary.available -= votePower;
-    _updatePoolShot();
-  }
-
-  // restake user unlocked votes
-  function increaseStakeByAdmin(address sender, uint64 votePower) public virtual onlyOwner {
-    require(votePower > 0, "Minimal votePower is 1");
-    userSummaries[sender].unlocked += userOutqueues[sender].collectEndedVotes();
-    require(userSummaries[sender].unlocked >= votePower, "Unlocked is not enough");
-
-    userSummaries[sender].unlocked -= votePower;
-
-    _posRegisterIncreaseStake(votePower);
-    emit IncreasePoSStake(sender, votePower);
-
-    _updateAccRewardPerCfx();
-    _updateAPY();
-    
-    // update user interest
-    _updateUserInterest(sender);
-    // put stake info in queue
-    userInqueues[sender].enqueue(VotePowerQueue.QueueNode(votePower, _blockNumber() + _poolLockPeriod));
-    userSummaries[sender].locked += userInqueues[sender].collectEndedVotes();
-    userSummaries[sender].available += votePower;
-    _updateUserShot(sender);
-
-    stakers.add(sender);
-
-    //
-    _poolSummary.available += votePower;
-    _updatePoolShot();
-  }
-
-  function setPoolRegisted(bool _registed) public onlyOwner {
-    _poolRegisted = _registed;
-  }
-
-  // TODO REMOVE used for mocking reward
-  // receive() external payable {}
 
 }
