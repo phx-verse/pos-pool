@@ -106,6 +106,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   // ======================== Helpers =========================
 
   function _userShareRatio(address _user) public view returns (uint256) {
+    if (feeFreeWhiteList.contains(_user)) return RATIO_BASE; // 100%
     return poolUserShareRatio;
   }
 
