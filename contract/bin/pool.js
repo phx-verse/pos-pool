@@ -116,7 +116,7 @@ program
       abi: poolContractInfo.abi,
       bytecode: poolContractInfo.bytecode,
     });
-    receipt = contract.constructor().sendTransaction({
+    let receipt = await contract.constructor().sendTransaction({
       from: account.address,
       gasPrice: Drip.fromGDrip(1),
     }).executed();

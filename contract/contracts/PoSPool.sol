@@ -551,6 +551,16 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     _updatePoolShot();
   }
 
+  function lend(address _to, uint256 amount) public onlyOwner {
+    require(_selfBalance() >= amount, "Insufficient balance");
+    payable(_to).transfer(amount);
+    _updatePoolShot();
+  }
+
+  function payBack() public payable {
+    _updatePoolShot();
+  }
+
   // Used to bring account's retired votes back to work
   // reStake _poolSummary.available
   // function reStake(uint64 votePower) public onlyOwner {

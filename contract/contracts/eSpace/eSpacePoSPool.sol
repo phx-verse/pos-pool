@@ -460,6 +460,11 @@ contract ESpacePoSPool is Ownable, Initializable {
     _updatePoolShot();
   }
 
+  function lend(address _to, uint256 amount) public onlyOwner {
+    require(_selfBalance() >= amount, "Insufficient balance");
+    payable(_to).transfer(amount);
+  }
+
   // ======================== bridge methods =====================
 
   function setPoolAPY(uint256 apy) public onlyBridge {
