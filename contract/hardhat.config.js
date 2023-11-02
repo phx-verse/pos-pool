@@ -5,6 +5,7 @@ require("@nomiclabs/hardhat-etherscan");
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
+require("hardhat-conflux");
 // require("hardhat-contract-sizer");
 const { loadPrivateKey } = require('./utils');
 
@@ -50,6 +51,13 @@ module.exports = {
         PRIVATE_KEY,
       ],
       chainId: 8889,
+    },
+    testnet: {
+      url: "https://test.confluxrpc.com",
+      accounts: [
+        PRIVATE_KEY,
+      ],
+      chainId: 1,
     },
   },
   gasReporter: {
