@@ -54,7 +54,7 @@ program
 program
   .command('poolStatus [address]')
   .action(async (address) => {
-    const poolAddress = address || process.env.POOL_ADDRESS;
+    const poolAddress = address || POOL_ADDRESS;
     const contract = conflux.Contract({
       address: poolAddress,
       abi: poolContractInfo.abi,
@@ -108,8 +108,23 @@ program
   });
 
 program
+  .command('poolBatchCallAddPool')
+  .argument('[poolAddr]', 'Pool address')
+  .action(async (poolAddr) => {
+    const meta = getContractInfo('PoSPoolBatchCall');
+    const contract = conflux.Contract({
+      abi: meta.abi,
+      address: process.env.BATCH_CALL_UTIL
+    });
+    const receipt = await contract.addPoSPool(poolAddr).sendTransaction({
+      from: account.address,
+    }).executed();
+    checkReceiptStatus(receipt, 'BatchCall util addPoSPool');
+  });
+
+program
   .command('deployPoSPool')
-  .description('Deploy PoSPool in proxy mode')
+  .description('Deploy PoSPool in proxy mode, just deploy contract, not register to PoS')
   .action(async () => {
     // deploy pool implementation
     const contract = conflux.Contract({
@@ -141,120 +156,18 @@ program
   });
 
 program
-  .command('deployVotingEscrow')
-  .description('Deploy VotingEscrow in proxy mode')
+  .command('registerPool')
   .action(async () => {
-    const contract = conflux.Contract({
-      abi: votingEscrowContractInfo.abi,
-      bytecode: votingEscrowContractInfo.bytecode,
-    });
-    receipt = await contract.constructor().sendTransaction({
+    const receipt = await conflux.cfx.sendTransaction({
       from: account.address,
+      value: Drip.fromCFX(1000),
+      to: POOL_ADDRESS,
+      data: process.env.POS_REGIST_DATA,
     }).executed();
-    if (receipt.outcomeStatus !== 0) {
-      console.log('Implementation contract deploy failed: ', receipt.txExecErrorMsg);
-      return;
-    }
-    const implAddr = receipt.contractCreated;
-    // console.log('Implementation address: ', implAddr);
-
-    // deploy pool proxy
-    const proxyInfo = getContractInfo('PoolProxy');
-    const proxy = conflux.Contract({
-      abi: proxyInfo.abi,
-      bytecode: proxyInfo.bytecode,
-    });
-    const initializeAbiName = '0x8129fc1c';
-    receipt = await proxy.constructor(implAddr, initializeAbiName).sendTransaction({
-      from: account.address
-    }).executed();
-    checkDeployStatus(receipt, 'Deploy VotingEscrow');
-
-    // set posPool address
-    const votingEscrow = conflux.Contract({
-        abi: votingEscrowContractInfo.abi,
-        address: receipt.contractCreated,
-    });
-
-    await votingEscrow.setPosPool(POOL_ADDRESS).sendTransaction({
-        from: account.address
-    }).executed();
-
-    console.log('Finished');
+    checkReceiptStatus(receipt, 'Register Pool');
   });
 
 program
-  .command('deployDebugPool')
-  .action(async (arg) => {
-    const meta = getContractInfo('PoolDebug');
-    const contract = conflux.Contract({
-      abi: meta.abi,
-      bytecode: meta.bytecode,
-    });
-    const { MOCK_STAKE, MOCK_POS_REGISTER } = process.env;
-    const receipt = await contract.constructor(MOCK_STAKE, MOCK_POS_REGISTER).sendTransaction({
-      from: account.address
-    }).executed();
-    checkDeployStatus(receipt, 'deploy debugPool');
-  });
-
-program
-  .command('queryPoolImplAddr')
-  .action(async () => {
-    const proxyInfo = getContractInfo('PoolProxy');
-    const poolProxyContract = conflux.Contract({
-        abi: proxyInfo.abi,
-        address: POOL_ADDRESS,
-    });
-    const address = await poolProxyContract.implementation();
-    console.log('Implementation address: ', address);
-  });
-
-program
-  .command('upgradePoolContract <address>')
-  .action(async (address) => {
-    const proxyInfo = getContractInfo('PoolProxy');
-    const poolProxyContract = conflux.Contract({
-        abi: proxyInfo.abi,
-        address: POOL_ADDRESS,
-    });
-    const receipt = await poolProxyContract.upgradeTo(address).sendTransaction({
-      from: account.address,
-    }).executed();
-    checkReceiptStatus(receipt, "Upgrade");
-  });
-
-program
-  .command('upgradeProxy1967 <proxyAddr> <implAddr>')
-  .action(async (proxyAddr, implAddr) => {
-    let meta = getContractInfo('PoolProxy');
-    let contract = conflux.Contract({
-      abi: meta.abi,
-      address: proxyAddr
-    });
-    const receipt = await contract.upgradeTo(implAddr).sendTransaction({
-      from: account.address,
-    }).executed();
-    checkReceiptStatus(receipt, "Upgrade");
-  });
-
-program
-  .command('CoreBridge')
-  .argument('<method>', 'Available methods: withdrawVotesByVotes, withdrawVotes')
-  .argument('[arg]', 'Arguments for the method')
-  .action(async (method, arg) => {
-    const meta = getContractInfo('CoreBridge');
-    let contract = conflux.Contract({
-      abi: meta.abi,
-      address: process.env.ESPACE_POOL_CORE_PROXY
-    });
-    const receipt = await contract[method](arg).sendTransaction({
-      from: account.address,
-    }).executed();
-    checkReceiptStatus(receipt, method);
-  });
-
-  program
   .command('Pool')
   .argument('<method>', 'Available methods: setPoolName, setPoolUserShareRatio, setLockPeriod, setUnlockPeriod, _withdrawPoolProfit, addToFeeFreeWhiteList, removeFromFeeFreeWhiteList, setPoolRegisted')
   .argument('[args...]', 'Arguments for the method')
@@ -276,6 +189,16 @@ program
   });
 
 program
+  .command('QueryPool')
+  .argument('<method>', 'Available methods: poolSummary, userSummary, identifierToAddress, userInQueue, userOutQueue, userInterest, poolAPY, poolName, userInterest, posAddress')
+  .argument('[args...]', 'Arguments for the method')
+  .action(async (method, args) => {
+    if (!poolContract[method]) throw new Error ('Invalid method');
+    const result = await poolContract[method](...args);
+    console.log(result);
+  });
+
+program
   .command('withdrawPoolProfit')
   .argument('<receiver>', 'Reciver address')
   .action(async (receiver) => {
@@ -293,38 +216,6 @@ program
       value: toClaim
     }).executed();
     checkReceiptStatus(transferReceipt, 'send CFX');
-  });
-
-program
-  .command('registerPool')
-  .action(async () => {
-    const receipt = await conflux.cfx.sendTransaction({
-      from: account.address,
-      value: Drip.fromCFX(1000),
-      to: POOL_ADDRESS,
-      data: process.env.POS_REGIST_DATA,
-    }).executed();
-    checkReceiptStatus(receipt, 'Register Pool');
-  });
-
-program
-  .command('retireUserStake <user> <endBlock>')
-  .action(async (user, endBlock) => {
-    const contract = poolContract;
-    const receipt = await contract._retireUserStake(user, parseInt(endBlock)).sendTransaction({
-      from: account.address,
-    }).executed();
-    checkReceiptStatus(receipt, 'retire');
-  });
-
-program
-  .command('QueryPool')
-  .argument('<method>', 'Available methods: poolSummary, userSummary, identifierToAddress, userInQueue, userOutQueue, userInterest, poolAPY, poolName, userInterest, posAddress')
-  .argument('[args...]', 'Arguments for the method')
-  .action(async (method, args) => {
-    if (!poolContract[method]) throw new Error ('Invalid method');
-    const result = await poolContract[method](...args);
-    console.log(result);
   });
 
 program
@@ -360,11 +251,48 @@ program
   });
 
 program
-  .command('PoolManagerQueryEPool')
-  .argument('<arg>', 'corePoolAddr')
-  .action(async (corePoolAddr) => {
-    const ePoolAddress = await poolManagerContract.eSpacePoolAddresses(corePoolAddr);
-    console.log(format.hexAddress(ePoolAddress));
+  .command('restakeVotes')
+  .description('Restake available votes to PoS')
+  .argument('[args...]', 'Optional arguments for the method')
+  .action(async (args) => {
+    // console.log(args);
+    const accountInfo = await conflux.cfx.getAccount(POOL_ADDRESS);
+    const posVotes = Number(Drip(accountInfo.stakingBalance).toCFX())/1000;
+    // console.log('Total staked PoS votes', posVotes);
+
+    let posAddress = await poolContract.posAddress();
+    posAddress = format.hex(posAddress);
+    // console.log('PoS node address: ', posAddress);
+
+    const posAccount = await conflux.pos.getAccount(posAddress);
+    // console.log('locked', posAccount.status.locked);
+    // console.log('availableVotes', posAccount.status.availableVotes);
+    // console.log('inQueue length', posAccount.status.inQueue.length);
+    // console.log('outQueue length', posAccount.status.outQueue);
+    const unlocking = posAccount.status.outQueue.reduce((acc, cur) => acc + cur.power, 0);
+    console.log('Pool Unlocking', unlocking);
+
+    let userUnlock = await totalUnlock();
+    userUnlock = Number(userUnlock.toString());
+    console.log('User unlocked', userUnlock);
+
+    const needRestake = posVotes - posAccount.status.availableVotes - userUnlock;
+    console.log('Votes need to restake', needRestake);
+    if (needRestake === 0) return;
+
+    const availableForRestake = needRestake - unlocking;
+    console.log('Available for restake', availableForRestake);
+    
+    if (availableForRestake <= 0) return;
+
+    const receipt = await poolContract
+            ._retirePosVote(availableForRestake)
+            .sendTransaction({
+                from: account.address,
+            })
+            .executed();
+
+    console.log(receipt.outcomeStatus === 0 ? "Restake Success" : "Unlock Failed");
   });
 
 program
@@ -397,7 +325,7 @@ function getContractInfo(name) {
     case "PoolManager":
       return poolManagerInfo;
     case "PoolProxy":
-      return require("../artifacts/contracts/PoSPoolProxy1967.sol/PoSPoolProxy1967.json");
+      return require("../artifacts/contracts/utils/Proxy1967.sol/Proxy1967.json");
     case "MockStaking":
       return require("../artifacts/contracts/mocks/Staking.sol/MockStaking.json");
     case "MockPosRegister":
@@ -406,7 +334,26 @@ function getContractInfo(name) {
       return require('../artifacts/contracts/eSpace/CoreBridge.sol/CoreBridge.json');
     case "VotingEscrow":
       return votingEscrowContractInfo;
+    case "PoSPoolBatchCall":
+      return require('../artifacts/contracts/utils/PoSPoolBatchCall.sol/PoSPoolBatchCall.json');
     default:
       throw new Error(`Unknown contract name: ${name}`);
   }
+}
+
+async function totalUnlock() {
+    let total = 0n;
+    const stakerCount = await poolContract.stakerNumber();
+    for (let i = 0; i < stakerCount; i += 1) {
+        const addr = await poolContract.stakerAddress(i);
+        
+        const userSummary = await poolContract.userSummary(addr);
+        total += userSummary.votes - userSummary.available;
+        await waitMilliseconds(100);
+    }
+    return total;
+}
+
+async function waitMilliseconds(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

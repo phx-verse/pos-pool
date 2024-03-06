@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@confluxfans/contracts/InternalContracts/ParamsControl.sol";
 import "./PoolContext.sol";
-import "./VotePowerQueue.sol";
-import "./PoolAPY.sol";
+import "./utils/VotePowerQueue.sol";
+import "./utils/PoolAPY.sol";
 import "./interfaces/IVotingEscrow.sol";
 
 ///
@@ -611,8 +611,12 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     uint256 votePower = userSummaries[_addr].available;
     if (votePower == 0) return;
 
+    _updateAccRewardPerCfx();
+
     _updateUserInterest(_addr);
+
     userSummaries[_addr].available = 0;
+
     userSummaries[_addr].locked = 0;
     // clear user inqueue
     userInqueues[_addr].clear();
@@ -620,25 +624,31 @@ contract PoSPool is PoolContext, Ownable, Initializable {
     _updateUserShot(_addr);
 
     _poolSummary.available -= votePower;
-  }
-
-  // When pool node is force retired, use this method to make all user's available stake to unlocking
-  function _retireUserStakes(uint256 offset, uint256 limit, uint64 endBlockNumber) public onlyOwner {
-    uint256 len = stakers.length();
-    if (len == 0) return;
-    
-    _updateAccRewardPerCfx();
-    _updateAPY();
-
-    uint256 end = offset + limit;
-    if (end > len) end = len;
-    for (uint256 i = offset; i < end; i++) {
-      _retireUserStake(stakers.at(i), endBlockNumber);
-    }
-
     _updatePoolShot();
   }
 
   // TODO REMOVE used for mocking reward
   // receive() external payable {}
+  function _restakePosVote(uint64 votes) public onlyOwner {
+    _posRegisterIncreaseStake(votes);
+  }
+
+  function _restakeUserStake(address _addr) public onlyOwner {
+    userSummaries[_addr].unlocked += userOutqueues[_addr].collectEndedVotes();
+    uint256 votePower = userSummaries[_addr].unlocked;
+    require(votePower > 0, "Minimal votePower is 1");
+    
+    _posRegisterIncreaseStake(uint64(votePower));
+
+    // put stake info in queue
+    userInqueues[_addr].enqueue(VotePowerQueue.QueueNode(votePower, _blockNumber() + _poolLockPeriod));
+    userSummaries[_addr].available += votePower;
+    userSummaries[_addr].unlocked = 0;
+    _updateUserShot(_addr);
+
+    //
+    _poolSummary.available += votePower;
+    _updatePoolShot();
+  }
+
 }

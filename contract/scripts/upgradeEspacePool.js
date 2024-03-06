@@ -11,22 +11,13 @@ async function main() {
     const pool = await ESpacePoSPool.deploy();
     await pool.deployed();
 
-    console.log('Impl deployed to:', pool.address);
+    console.log('New Impl deployed to:', pool.address);
 
-    const proxy = await ethers.getContractAt("Proxy1967", proxyAddr);
-    await proxy.upgradeTo(pool.address); */
-
-    const ePool = await ethers.getContractAt("ESpacePoSPool", proxyAddr);
-
-    let tx = await ePool.lend('0x48d15d4eD5C41782cC711F2Cb7b6606AC40d7275', ethers.utils.parseEther('200000'), {gasLimit: 100000});
-    await tx.wait();
-
-    /* let tx = await ePool.setLockPeriod(1123200);
-    await tx.wait();
-    tx = await ePool.setUnlockPeriod(86400);
-    await tx.wait(); */
+    const proxy = await ethers.getContractAt("Proxy1967", process.env.ESPACE_POOL_ADDRESS);
+    await proxy.upgradeTo(pool.address);
 
     console.log('Finished');
+    */
 }
 
 main().catch(console.log);
