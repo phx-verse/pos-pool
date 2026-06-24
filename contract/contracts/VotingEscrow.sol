@@ -22,7 +22,7 @@ contract VotingEscrow is Ownable, Initializable, IVotingEscrow {
     uint256 private constant ONE_DAY_BLOCK_NUMBER = 2 * 3600 * 24;
     uint256 public constant QUARTER_BLOCK_NUMBER = ONE_DAY_BLOCK_NUMBER * 365 / 4; // 3 months
     uint256 private constant CFX_VALUE_OF_ONE_VOTE = 1000 ether;
-    uint16 private constant TOTAL_TOPIC = 3;
+    uint16 private constant TOTAL_TOPIC = 4;
     
     IPoSPool public posPool;
 
@@ -192,7 +192,7 @@ contract VotingEscrow is Ownable, Initializable, IVotingEscrow {
                     userVoteInfo[vote_round][addr][topic_index][index] -= delta;
                     poolVoteInfo[vote_round][topic_index][index] -= delta;
                     if (currentPower == userVotePower(addr, _currentRoundEndBlock())) {
-                        topicSpecialVoters[vote_round][topic_index].remove(msg.sender);
+                        topicSpecialVoters[vote_round][topic_index].remove(addr);
                         delete userVoteMeta[vote_round][addr][topic_index];
                     } else {
                         userVoteMeta[vote_round][addr][topic_index] = VoteMeta(block.number, currentPower);

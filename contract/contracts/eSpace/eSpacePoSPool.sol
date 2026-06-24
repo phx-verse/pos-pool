@@ -61,7 +61,7 @@ contract ESpacePoSPool is Ownable, Initializable {
 
   address public votingEscrow;
 
-  // ======================== Events =========================
+  uint256 private _reentrancyStatus; // must be last storage variable to avoid slot shift
 
   event IncreasePoSStake(address indexed user, uint256 votePower);
 
@@ -82,6 +82,13 @@ contract ESpacePoSPool is Ownable, Initializable {
   modifier onlyBridge() {
     require(msg.sender == _bridgeAddress, "Only bridge is allowed");
     _;
+  }
+
+  modifier nonReentrant() {
+    require(_reentrancyStatus != 2, "ReentrancyGuard: reentrant call");
+    _reentrancyStatus = 2;
+    _;
+    _reentrancyStatus = 1;
   }
 
   // ======================== Helpers =========================
@@ -129,6 +136,17 @@ contract ESpacePoSPool is Ownable, Initializable {
     _poolSummary.totalInterest = _poolSummary.totalInterest.add(reward);
   }
 
+  function _updateAccRewardPerCfxWithReward(uint256 reward) private {
+    if (reward == 0 || lastPoolShot.available == 0) return;
+
+    // update global accRewardPerCfx
+    uint256 cfxCount = lastPoolShot.available.mul(CFX_COUNT_OF_ONE_VOTE);
+    accRewardPerCfx = accRewardPerCfx.add(reward.div(cfxCount));
+
+    // update pool interest info
+    _poolSummary.totalInterest = _poolSummary.totalInterest.add(reward);
+  }
+
   // depend on: accRewardPerCfx and lastUserShot
   function _updateUserInterest(address _user) private {
     IPoSPool.UserShot memory uShot = lastUserShots[_user];
@@ -156,13 +174,14 @@ contract ESpacePoSPool is Ownable, Initializable {
   /// @notice Increase PoS vote power
   /// @param votePower The number of vote power to increase
   ///
-  function increaseStake(uint64 votePower) public virtual payable onlyRegisted {
+  function increaseStake(uint64 votePower) public virtual payable onlyRegisted nonReentrant {
     require(votePower > 0, "Minimal votePower is 1");
     require(msg.value == votePower * CFX_VALUE_OF_ONE_VOTE, "msg.value should be votePower * 1000 ether");
     
     // transfer to bridge address
     address payable receiver = payable(_bridgeAddress);
-    receiver.transfer(msg.value);
+    (bool success, ) = receiver.call{value: msg.value}("");
+    require(success, "Transfer failed");
     crossingVotes += votePower;
 
     emit IncreasePoSStake(msg.sender, votePower);
@@ -190,11 +209,12 @@ contract ESpacePoSPool is Ownable, Initializable {
   /// @param votePower The number of vote power to decrease
   ///
   function decreaseStake(uint64 votePower) public virtual onlyRegisted {
+    require(votePower > 0, "Minimal votePower is 1");
     userSummaries[msg.sender].locked += userInqueues[msg.sender].collectEndedVotes();
     require(userSummaries[msg.sender].locked >= votePower, "Locked is not enough");
 
     // if user has locked cfx for vote power, the rest amount should bigger than that
-    IVotingEscrow.LockInfo memory lockInfo = IVotingEscrow(votingEscrow).userLockInfo(msg.sender);
+    IVotingEscrow.LockInfo memory lockInfo = userLockInfo(msg.sender);
     require((userSummaries[msg.sender].available - votePower) * CFX_VALUE_OF_ONE_VOTE >= lockInfo.amount, "Locked is not enough");
 
     // record the decrease request
@@ -221,11 +241,13 @@ contract ESpacePoSPool is Ownable, Initializable {
   /// @notice Withdraw PoS vote power
   /// @param votePower The number of vote power to withdraw
   ///
-  function withdrawStake(uint64 votePower) public onlyRegisted {
+  function withdrawStake(uint64 votePower) public onlyRegisted nonReentrant {
     userSummaries[msg.sender].unlocked += userOutqueues[msg.sender].collectEndedVotes();
     require(userSummaries[msg.sender].unlocked >= votePower, "Unlocked is not enough");
     uint256 _withdrawAmount = votePower * CFX_VALUE_OF_ONE_VOTE;
     require(withdrawableCfx >= _withdrawAmount, "Withdrawable CFX is not enough");
+    //
+    _updateAccRewardPerCfx();
     // update amount of withdrawable CFX
     withdrawableCfx -= _withdrawAmount;
     //    
@@ -233,7 +255,8 @@ contract ESpacePoSPool is Ownable, Initializable {
     userSummaries[msg.sender].votes -= votePower;
     
     address payable receiver = payable(msg.sender);
-    receiver.transfer(_withdrawAmount);
+    (bool success, ) = receiver.call{value: _withdrawAmount}("");
+    require(success, "Transfer failed");
     emit WithdrawStake(msg.sender, votePower);
 
     _updatePoolShot();
@@ -272,7 +295,7 @@ contract ESpacePoSPool is Ownable, Initializable {
   /// @notice Claim specific amount user interest
   /// @param amount The amount of interest to claim
   ///
-  function claimInterest(uint amount) public onlyRegisted {
+  function claimInterest(uint amount) public onlyRegisted nonReentrant {
     uint claimableInterest = userInterest(msg.sender);
     require(claimableInterest >= amount, "Interest not enough");
 
@@ -287,7 +310,8 @@ contract ESpacePoSPool is Ownable, Initializable {
 
     // send interest to user
     address payable receiver = payable(msg.sender);
-    receiver.transfer(amount);
+    (bool success, ) = receiver.call{value: amount}("");
+    require(success, "Transfer failed");
     emit ClaimInterest(msg.sender, amount);
 
     // update blockNumber and balance
@@ -351,11 +375,17 @@ contract ESpacePoSPool is Ownable, Initializable {
   }
 
   function userLockInfo(address user) public view returns (IVotingEscrow.LockInfo memory) {
+    if (votingEscrow == address(0)) return IVotingEscrow.LockInfo(0, 0);
     return IVotingEscrow(votingEscrow).userLockInfo(user);
   }
 
   function userVotePower(address user) external view returns (uint256) {
+    if (votingEscrow == address(0)) return 0;
     return IVotingEscrow(votingEscrow).userVotePower(user);
+  }
+
+  function userShareRatio() public pure returns (uint256) {
+    return _userShareRatio();
   }
 
   // ======================== admin methods =====================
@@ -427,6 +457,10 @@ contract ESpacePoSPool is Ownable, Initializable {
 
   function handleUnlockedIncrease(uint256 votePower) public payable onlyBridge {
     require(msg.value == votePower * CFX_VALUE_OF_ONE_VOTE, "msg.value should be votePower * 1000 ether");
+    
+    uint256 newReward = _selfBalance() - lastPoolShot.balance - msg.value; // msg.value is not reward
+    _updateAccRewardPerCfxWithReward(newReward);
+
     withdrawableCfx += msg.value;
     _updatePoolShot();
   }

@@ -35,6 +35,12 @@
             "address": "cfx:acc5086t6uyww6barn1a2b6z8wdmdg376yeu9gczpz",
             "icon": "https://pos.webomatic.fi/favicon.ico",
             "website": "https://pos.webomatic.fi/"
+        },
+        {
+            "name": "STC Pool",
+            "address": "cfx:acaybd44zg93ew04vyzgmdct0juhjg4vkuj2wcxes6",
+            "icon": "https://conflux.stakewithstc.xyz/favicon.ico",
+            "website": "https://conflux.stakewithstc.xyz/"
         }
     ],
     "testnet": [
@@ -45,19 +51,30 @@
             "website": ""
         },
         {
-            "name": "test-a",
-            "address": "cfxtest:aca9rwdxwfa61d81c1xwnf54x1vbv1h1be0c0x3jff",
+            "name": "test6",
+            "address": "cfxtest:acfcgjrph2cmsb9h9b9jedbn3kza975egytnzew4xr",
             "icon": "https://confluxnetwork.org/favicon.ico",
             "website": ""
         }
     ],
     "eSpaceMainnet": [
-
+        {
+            "name": "PHX V1 eSpace",
+            "address": "0x3cbc6f7d406fe9701573fe6ddf28f4f17b5d46a3",
+            "icon": "https://pospool.phxverse.com/favicon.ico",
+            "website": "https://pospool.phxverse.com/espace"
+        }
     ],
     "eSpaceTestnet": [
         {
             "name": "e-test5",
             "address": "0x102e78b92Be30e94203Adf676f50563cbe3A5525",
+            "icon": "https://confluxnetwork.org/favicon.ico",
+            "website": ""
+        },
+        {
+            "name": "e-test6",
+            "address": "0x1E91e86C7f48DDAB885d0f21b2F83965a549E233",
             "icon": "https://confluxnetwork.org/favicon.ico",
             "website": ""
         }
