@@ -583,6 +583,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
 
   function _updatePoolProfit() public onlyOwner {
     _updateAccRewardPerCfx();
+    _updateAPY();
     _updatePoolShot();
 
     uint256 stakerNum = stakers.length();
@@ -594,8 +595,10 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   }
 
   function _withdrawPoolProfit(uint256 amount, address payable receiver) public onlyOwner nonReentrant {
-    require(_poolSummary.interest > amount, "Not enough interest");
-    require(_selfBalance() > amount, "Balance not enough");
+    _updateAccRewardPerCfx();
+    _updateAPY();
+    require(_poolSummary.interest >= amount, "Not enough interest");
+    require(_selfBalance() >= amount, "Balance not enough");
     _poolSummary.interest = _poolSummary.interest.sub(amount);
     (bool success, ) = receiver.call{value: amount}("");
     require(success, "Transfer failed");
