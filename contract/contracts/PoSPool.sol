@@ -98,7 +98,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   // unlock period: 1 days + half hour
   uint256 public _poolUnlockPeriod = ONE_DAY_BLOCK_COUNT + 3600; 
 
-  string public constant VERSION = "1.8.0";
+  string public constant VERSION = "1.9.0";
 
   ParamsControl public paramsControl = ParamsControl(0x0888000000000000000000000000000000000007);
 
@@ -108,7 +108,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
 
   uint256 private _reentrancyStatus; // must be last storage variable to avoid slot shift, added in version 1.8.0
 
-  uint256 public accRewardPerCfxMul;
+  uint256 public accRewardPerCfxMul; // added in version 1.9.0
   // ======================== Modifiers =========================
   modifier onlyRegisted() {
     require(_poolRegisted, "Pool is not registed");
@@ -635,6 +635,7 @@ contract PoSPool is PoolContext, Ownable, Initializable {
 
   function _updatePoolProfit() public onlyOwner {
     _updateAccRewardPerCfx();
+    _updateAPY();
     _updatePoolShot();
 
     uint256 stakerNum = stakers.length();
@@ -646,8 +647,10 @@ contract PoSPool is PoolContext, Ownable, Initializable {
   }
 
   function _withdrawPoolProfit(uint256 amount, address payable receiver) public onlyOwner nonReentrant {
-    require(_poolSummary.interest > amount, "Not enough interest");
-    require(_selfBalance() > amount, "Balance not enough");
+    _updateAccRewardPerCfx();
+    _updateAPY();
+    require(_poolSummary.interest >= amount, "Not enough interest");
+    require(_selfBalance() >= amount, "Balance not enough");
     _poolSummary.interest = _poolSummary.interest.sub(amount);
     (bool success, ) = receiver.call{value: amount}("");
     require(success, "Transfer failed");
